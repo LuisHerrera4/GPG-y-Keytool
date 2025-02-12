@@ -5,6 +5,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.nio.file.Files;
 import java.security.*;
+import java.security.cert.Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
@@ -36,13 +37,19 @@ public class GPG {
             // Ejercicio 8: Firmar un documento
             signDocument("archivo.txt", "private.key", "archivo_firmado.sig");
 
+            // Ejercicio 15: Cifrar una imagen con la clave pública del compañero
+            encryptImageWithPublicKey("imagen.jpg", "public_key_companero.asc", "imagen_cifrada.img");
+
+            // Ejercicio 16: Descifrar la imagen enviada por el compañero
+            decryptImageWithPrivateKey("imagen_cifrada.img", "private.key", "imagen_descifrada.jpg");
+
             System.out.println("Operaciones completadas.");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    // 1. Cifrar archivo con clave simétrica (AES)
+    // 1. Cifrar archivo (AES)
     public static void encryptFileAES(String inputFilePath, String outputFilePath) throws Exception {
         KeyGenerator keyGen = KeyGenerator.getInstance("AES");
         keyGen.init(128);
@@ -171,4 +178,43 @@ public class GPG {
         }
     }
 
+    // 15. Cifrar una imagen con la clave pública del compañero
+    public static void encryptImageWithPublicKey(String imagePath, String publicKeyPath, String encryptedImagePath) throws Exception {
+        byte[] publicKeyBytes = Base64.getDecoder().decode(new String(Files.readAllBytes(new File(publicKeyPath).toPath()))
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replaceAll("\n", ""));
+
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(publicKeyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PublicKey publicKey = keyFactory.generatePublic(keySpec);
+
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+
+        byte[] imageBytes = Files.readAllBytes(new File(imagePath).toPath());
+        byte[] encryptedBytes = cipher.doFinal(imageBytes);
+
+        try (FileOutputStream fos = new FileOutputStream(encryptedImagePath)) {
+            fos.write(encryptedBytes);
+        }
+    }
+
+    // 16. Descifrar la imagen enviada por el compañero
+    public static void decryptImageWithPrivateKey(String encryptedImagePath, String privateKeyPath, String decryptedImagePath) throws Exception {
+        byte[] privateKeyBytes = Files.readAllBytes(new File(privateKeyPath).toPath());
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(privateKeyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PrivateKey privateKey = keyFactory.generatePrivate(keySpec);
+
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.DECRYPT_MODE, privateKey);
+
+        byte[] encryptedBytes = Files.readAllBytes(new File(encryptedImagePath).toPath());
+        byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
+
+        try (FileOutputStream fos = new FileOutputStream(decryptedImagePath)) {
+            fos.write(decryptedBytes);
+        }
+    }
 }
